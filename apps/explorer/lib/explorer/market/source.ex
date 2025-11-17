@@ -42,6 +42,7 @@ defmodule Explorer.Market.Source do
     CryptoCompare,
     CryptoRank,
     DefiLlama,
+    FixedPrice,
     Mobula
   }
 
