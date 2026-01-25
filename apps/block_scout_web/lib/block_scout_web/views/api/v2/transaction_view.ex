@@ -72,6 +72,30 @@ defmodule BlockScoutWeb.API.V2.TransactionView do
     end)
   end
 
+  def render("transactions.json", %{
+        transactions: transactions,
+        next_page_params: next_page_params,
+        conn: conn,
+        current_address_hash: current_address_hash,
+        internal_value_flows: internal_value_flows
+      }) do
+    block_height = Chain.block_height(@api_true)
+    decoded_transactions = Transaction.decode_transactions(transactions, true, @api_true)
+
+    %{
+      "items" =>
+        transactions
+        |> with_chain_type_transformations()
+        |> Enum.zip(decoded_transactions)
+        |> Enum.map(fn {transaction, decoded_input} ->
+          transaction
+          |> prepare_transaction(conn, false, block_height, decoded_input)
+          |> add_internal_value_flow(transaction.hash, current_address_hash, internal_value_flows)
+        end),
+      "next_page_params" => next_page_params
+    }
+  end
+
   def render("transactions.json", %{transactions: transactions, next_page_params: next_page_params, conn: conn}) do
     block_height = Chain.block_height(@api_true)
     decoded_transactions = Transaction.decode_transactions(transactions, true, @api_true)
@@ -962,6 +986,43 @@ defmodule BlockScoutWeb.API.V2.TransactionView do
   end
 
   defp do_with_chain_type_fields(_chain_type, result, _transaction, _single_transaction?, _conn, _watchlist_names) do
+    result
+  end
+
+  @doc """
+  Adds internal value flow information to the transaction result.
+
+  This function calculates the net value flow from internal transactions
+  relative to the current address being viewed. It helps show the actual
+  value movement when the transaction's direct value is 0 but internal
+  transactions move funds.
+
+  ## Parameters
+    - `result`: The prepared transaction map
+    - `tx_hash`: The transaction hash
+    - `current_address_hash`: The address being viewed
+    - `internal_value_flows`: Map of aggregated internal transaction values
+
+  ## Returns
+    The result map with an added "internal_value_flow" field containing:
+    - "in": Total value received via internal transactions
+    - "out": Total value sent via internal transactions
+  """
+  defp add_internal_value_flow(result, tx_hash, _current_address_hash, internal_value_flows)
+       when is_map(internal_value_flows) do
+    case Map.get(internal_value_flows, tx_hash) do
+      nil ->
+        result
+
+      %{value_in: value_in, value_out: value_out} ->
+        Map.put(result, "internal_value_flow", %{
+          "in" => value_in,
+          "out" => value_out
+        })
+    end
+  end
+
+  defp add_internal_value_flow(result, _tx_hash, _current_address_hash, _internal_value_flows) do
     result
   end
 end

@@ -1058,4 +1058,67 @@ defmodule Explorer.Chain.InternalTransaction do
       (internal_transaction.type == :call and internal_transaction.value > ^0) or internal_transaction.type != :call
     )
   end
+
+  @doc """
+  Aggregates internal transaction value flows for a list of transaction hashes
+  relative to a specific address.
+
+  Returns a map where keys are transaction hashes and values are maps with
+  `:value_in` (sum of values where address is recipient) and `:value_out`
+  (sum of values where address is sender).
+
+  Only includes internal transactions with value > 0.
+
+  ## Parameters
+    - `transaction_hashes`: List of transaction hashes to aggregate
+    - `address_hash`: The address to calculate flows relative to
+    - `options`: Optional keyword list with `:api?` key
+
+  ## Returns
+    A map of `%{transaction_hash => %{value_in: Wei, value_out: Wei}}`
+
+  ## Example
+      iex> aggregate_value_flows_for_address([tx_hash1, tx_hash2], address_hash)
+      %{
+        tx_hash1 => %{value_in: %Wei{value: 100}, value_out: %Wei{value: 0}},
+        tx_hash2 => %{value_in: %Wei{value: 0}, value_out: %Wei{value: 50}}
+      }
+  """
+  @spec aggregate_value_flows_for_address([Hash.Full.t()], Hash.Address.t(), [api?]) :: %{
+          Hash.Full.t() => %{value_in: Wei.t(), value_out: Wei.t()}
+        }
+  def aggregate_value_flows_for_address([], _address_hash, _options), do: %{}
+
+  def aggregate_value_flows_for_address(transaction_hashes, address_hash, options \\ []) do
+    query =
+      from(it in __MODULE__,
+        where: it.transaction_hash in ^transaction_hashes,
+        where: it.value > ^0,
+        group_by: it.transaction_hash,
+        select: {
+          it.transaction_hash,
+          %{
+            value_in:
+              fragment(
+                "COALESCE(SUM(CASE WHEN ? = ? THEN value ELSE 0 END), 0)",
+                it.to_address_hash,
+                ^address_hash
+              ),
+            value_out:
+              fragment(
+                "COALESCE(SUM(CASE WHEN ? = ? THEN value ELSE 0 END), 0)",
+                it.from_address_hash,
+                ^address_hash
+              )
+          }
+        }
+      )
+
+    query
+    |> Chain.select_repo(options).all()
+    |> Enum.map(fn {tx_hash, %{value_in: value_in, value_out: value_out}} ->
+      {tx_hash, %{value_in: %Wei{value: value_in}, value_out: %Wei{value: value_out}}}
+    end)
+    |> Map.new()
+  end
 end
