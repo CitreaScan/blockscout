@@ -1102,13 +1102,13 @@ defmodule Explorer.Chain.InternalTransaction do
               fragment(
                 "COALESCE(SUM(CASE WHEN ? = ? THEN value ELSE 0 END), 0)",
                 it.to_address_hash,
-                ^address_hash
+                type(^address_hash, Hash.Address)
               ),
             value_out:
               fragment(
                 "COALESCE(SUM(CASE WHEN ? = ? THEN value ELSE 0 END), 0)",
                 it.from_address_hash,
-                ^address_hash
+                type(^address_hash, Hash.Address)
               )
           }
         }
