@@ -1,0 +1,132 @@
+services:
+  redis-db:
+    image: redis:alpine
+    container_name: redis-db
+    restart: unless-stopped
+    command: redis-server
+    volumes:
+      - ~/volumes/local/redis-db:/data
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: postgres:17
+    container_name: db
+    shm_size: 256m
+    restart: unless-stopped
+    command: postgres -c 'max_connections=200'
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-blockscout}
+      POSTGRES_USER: ${POSTGRES_USER:-blockscout}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ceWb1MeLBEeOIfk65gU8EjF8}
+    volumes:
+      - ~/volumes/local/db:/var/lib/postgresql/data
+    ports:
+      - '7432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U blockscout -d blockscout']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile
+    image: citreascan-backend:local
+    container_name: backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis-db:
+        condition: service_healthy
+    command: sh -c "bin/blockscout eval \"Elixir.Explorer.ReleaseTasks.create_and_migrate()\" && bin/blockscout start"
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    env_file:
+      - ./envs/common-blockscout.env
+      - ../.env.local
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-blockscout}:${POSTGRES_PASSWORD:-ceWb1MeLBEeOIfk65gU8EjF8}@db:5432/${POSTGRES_DB:-blockscout}
+      ACCOUNT_REDIS_URL: redis://redis-db:6379
+      # Citrea Testnet (DEV RPC)
+      ETHEREUM_JSONRPC_HTTP_URL: https://dev.rpc.testnet.citreascan.com/
+      ETHEREUM_JSONRPC_TRACE_URL: https://dev.rpc.testnet.citreascan.com/
+      CHAIN_ID: '5115'
+    ports:
+      - '4000:4000'
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '3'
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    image: citreascan-frontend:local
+    container_name: frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    env_file:
+      - ./envs/common-frontend.env
+    environment:
+      NEXT_PUBLIC_API_HOST: localhost
+      NEXT_PUBLIC_API_PROTOCOL: http
+      NEXT_PUBLIC_APP_HOST: localhost
+      NEXT_PUBLIC_APP_PROTOCOL: http
+      NEXT_PUBLIC_STATS_API_HOST: ''
+      NEXT_PUBLIC_VISUALIZE_API_HOST: ''
+      NEXT_PUBLIC_NETWORK_NAME: Citrea Testnet
+      NEXT_PUBLIC_NETWORK_SHORT_NAME: Citrea Testnet
+      NEXT_PUBLIC_NETWORK_ID: '5115'
+      NEXT_PUBLIC_NETWORK_CURRENCY_NAME: Citrea
+      NEXT_PUBLIC_NETWORK_CURRENCY_SYMBOL: cBTC
+      NEXT_PUBLIC_NETWORK_CURRENCY_DECIMALS: '18'
+      NEXT_PUBLIC_IS_TESTNET: 'true'
+      NEXT_PUBLIC_HOMEPAGE_CHARTS: "['daily_txs']"
+      NEXT_PUBLIC_AD_BANNER_PROVIDER: none
+      NEXT_PUBLIC_AD_TEXT_PROVIDER: none
+      NEXT_PUBLIC_PROMOTE_BLOCKSCOUT_IN_TITLE: 'false'
+      NEXT_PUBLIC_TRANSACTION_INTERPRETATION_PROVIDER: blockscout
+      NEXT_PUBLIC_OG_DESCRIPTION: "Explore the Citrea Testnet blockchain with CitreaScan. Track transactions, verify contracts, analyze addresses, and access complete blockchain data and APIs."
+      NEXT_PUBLIC_NETWORK_RPC_URL: https://dev.rpc.testnet.citreascan.com/
+      NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID: 743867c2-73db-402e-bd47-c875169c3792
+    ports:
+      - '3000:3000'
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '3'
+
+  proxy:
+    image: nginx:alpine
+    container_name: proxy
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./proxy/default.conf.template.local:/etc/nginx/templates/default.conf.template
+    environment:
+      BACK_PROXY_PASS: http://backend:4000
+      FRONT_PROXY_PASS: http://frontend:3000
+    ports:
+      - '80:80'
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '3'
