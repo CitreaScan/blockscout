@@ -408,6 +408,16 @@ defmodule BlockScoutWeb.API.V2.AddressController do
           results_plus_one = Transaction.address_to_transactions_without_rewards(address_hash, options, false)
           {transactions, next_page} = split_list_by_page(results_plus_one)
 
+          # Aggregate internal transaction value flows for this address
+          transaction_hashes = Enum.map(transactions, & &1.hash)
+
+          internal_value_flows =
+            InternalTransaction.aggregate_value_flows_for_address(
+              transaction_hashes,
+              address_hash,
+              @api_true
+            )
+
           next_page_params =
             next_page
             |> next_page_params(
@@ -421,7 +431,9 @@ defmodule BlockScoutWeb.API.V2.AddressController do
           |> put_view(TransactionView)
           |> render(:transactions, %{
             transactions: transactions |> maybe_preload_ens() |> maybe_preload_metadata(),
-            next_page_params: next_page_params
+            next_page_params: next_page_params,
+            current_address_hash: address_hash,
+            internal_value_flows: internal_value_flows
           })
 
         _ ->
