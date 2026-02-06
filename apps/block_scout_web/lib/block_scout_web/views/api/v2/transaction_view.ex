@@ -1025,8 +1025,8 @@ defmodule BlockScoutWeb.API.V2.TransactionView do
 
       %{value_in: value_in, value_out: value_out} ->
         Map.put(result, "internal_value_flow", %{
-          "in" => value_in,
-          "out" => value_out
+          "in" => to_string(value_in.value),
+          "out" => to_string(value_out.value)
         })
     end
   end
