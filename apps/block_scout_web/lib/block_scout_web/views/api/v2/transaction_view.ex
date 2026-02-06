@@ -130,13 +130,22 @@ defmodule BlockScoutWeb.API.V2.TransactionView do
     end)
   end
 
-  def render("transaction.json", %{transaction: transaction, conn: conn}) do
+  def render("transaction.json", %{transaction: transaction, conn: conn} = assigns) do
     block_height = Chain.block_height(@api_true)
     [decoded_input] = Transaction.decode_transactions([transaction], false, @api_true)
 
-    transaction
-    |> with_chain_type_transformations()
-    |> prepare_transaction(conn, true, block_height, decoded_input)
+    result =
+      transaction
+      |> with_chain_type_transformations()
+      |> prepare_transaction(conn, true, block_height, decoded_input)
+
+    case assigns do
+      %{current_address_hash: address_hash, internal_value_flows: flows} ->
+        add_internal_value_flow(result, transaction.hash, address_hash, flows)
+
+      _ ->
+        result
+    end
   end
 
   def render("raw_trace.json", %{raw_traces: raw_traces}) do

@@ -181,6 +181,13 @@ defmodule BlockScoutWeb.API.V2.TransactionController do
              @token_transfers_in_transaction_necessity_by_association,
              @api_true |> fetch_scam_token_toggle(conn)
            ) do
+      internal_value_flows =
+        InternalTransaction.aggregate_value_flows_for_address(
+          [transaction.hash],
+          transaction.from_address_hash,
+          @api_true
+        )
+
       conn
       |> put_status(200)
       |> render(:transaction, %{
@@ -188,7 +195,9 @@ defmodule BlockScoutWeb.API.V2.TransactionController do
           preloaded
           |> Instance.preload_nft(@api_true)
           |> maybe_preload_ens_to_transaction()
-          |> maybe_preload_metadata_to_transaction()
+          |> maybe_preload_metadata_to_transaction(),
+        current_address_hash: transaction.from_address_hash,
+        internal_value_flows: internal_value_flows
       })
     end
   end
