@@ -181,12 +181,33 @@ defmodule BlockScoutWeb.API.V2.TransactionController do
              @token_transfers_in_transaction_necessity_by_association,
              @api_true |> fetch_scam_token_toggle(conn)
            ) do
-      internal_value_flows =
-        InternalTransaction.aggregate_value_flows_for_address(
-          [transaction.hash],
-          transaction.from_address_hash,
-          @api_true
-        )
+      # Try address-specific flow first, fallback to total flow if no value found
+      address_flows = InternalTransaction.aggregate_value_flows_for_address(
+        [transaction.hash],
+        transaction.from_address_hash,
+        @api_true
+      )
+
+      internal_value_flows = case Map.get(address_flows, transaction.hash) do
+        %{value_in: %{value: 0}, value_out: %{value: 0}} ->
+          # No value flow for the sender address, calculate total transaction flow
+          total_flow = InternalTransaction.aggregate_total_value_flow_for_transaction(
+            transaction.hash,
+            @api_true
+          )
+          %{transaction.hash => total_flow}
+        
+        flow when is_map(flow) ->
+          address_flows
+        
+        nil ->
+          # No flow data, calculate total
+          total_flow = InternalTransaction.aggregate_total_value_flow_for_transaction(
+            transaction.hash,
+            @api_true
+          )
+          %{transaction.hash => total_flow}
+      end
 
       conn
       |> put_status(200)

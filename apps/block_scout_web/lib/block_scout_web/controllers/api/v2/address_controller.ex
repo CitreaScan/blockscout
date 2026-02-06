@@ -411,12 +411,41 @@ defmodule BlockScoutWeb.API.V2.AddressController do
           # Aggregate internal transaction value flows for this address
           transaction_hashes = Enum.map(transactions, & &1.hash)
 
-          internal_value_flows =
+          address_flows =
             InternalTransaction.aggregate_value_flows_for_address(
               transaction_hashes,
               address_hash,
               @api_true
             )
+
+          # Apply fallback for transactions with no address-specific flow
+          internal_value_flows =
+            Enum.reduce(transaction_hashes, address_flows, fn tx_hash, flows ->
+              case Map.get(flows, tx_hash) do
+                %{value_in: %{value: 0}, value_out: %{value: 0}} ->
+                  # No value flow for this address, calculate total transaction flow
+                  total_flow =
+                    InternalTransaction.aggregate_total_value_flow_for_transaction(
+                      tx_hash,
+                      @api_true
+                    )
+
+                  Map.put(flows, tx_hash, total_flow)
+
+                nil ->
+                  # No flow data, calculate total
+                  total_flow =
+                    InternalTransaction.aggregate_total_value_flow_for_transaction(
+                      tx_hash,
+                      @api_true
+                    )
+
+                  Map.put(flows, tx_hash, total_flow)
+
+                _ ->
+                  flows
+              end
+            end)
 
           next_page_params =
             next_page
