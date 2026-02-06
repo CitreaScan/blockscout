@@ -1156,10 +1156,12 @@ defmodule Explorer.Chain.InternalTransaction do
         }
       )
 
+    zero = Decimal.new(0)
+
     case Chain.select_repo(options).one(query) do
-      nil -> %{value_in: %Wei{value: 0}, value_out: %Wei{value: 0}}
-      %{total_value: total} when total > 0 -> %{value_in: %Wei{value: 0}, value_out: %Wei{value: total}}
-      _ -> %{value_in: %Wei{value: 0}, value_out: %Wei{value: 0}}
+      nil -> %{value_in: %Wei{value: zero}, value_out: %Wei{value: zero}}
+      %{total_value: total} when total > 0 -> %{value_in: %Wei{value: zero}, value_out: %Wei{value: total}}
+      _ -> %{value_in: %Wei{value: zero}, value_out: %Wei{value: zero}}
     end
   end
 end
