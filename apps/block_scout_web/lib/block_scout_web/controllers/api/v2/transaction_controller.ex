@@ -189,16 +189,17 @@ defmodule BlockScoutWeb.API.V2.TransactionController do
       )
 
       internal_value_flows = case Map.get(address_flows, transaction.hash) do
-        %{value_in: %{value: 0}, value_out: %{value: 0}} ->
-          # No value flow for the sender address, calculate total transaction flow
-          total_flow = InternalTransaction.aggregate_total_value_flow_for_transaction(
-            transaction.hash,
-            @api_true
-          )
-          %{transaction.hash => total_flow}
-        
         flow when is_map(flow) ->
-          address_flows
+          if zero_wei_flow?(flow) do
+            # No value flow for the sender address, calculate total transaction flow
+            total_flow = InternalTransaction.aggregate_total_value_flow_for_transaction(
+              transaction.hash,
+              @api_true
+            )
+            %{transaction.hash => total_flow}
+          else
+            address_flows
+          end
         
         nil ->
           # No flow data, calculate total
@@ -821,4 +822,15 @@ defmodule BlockScoutWeb.API.V2.TransactionController do
       {:ok, transaction, transaction_hash}
     end
   end
+
+  # Helper function to check if a Wei flow has zero values
+  # Handles both integer 0 and Decimal.new(0) from database queries
+  defp zero_wei_flow?(%{value_in: %Chain.Wei{value: in_val}, value_out: %Chain.Wei{value: out_val}}) do
+    is_zero_value(in_val) and is_zero_value(out_val)
+  end
+  defp zero_wei_flow?(_), do: false
+
+  defp is_zero_value(0), do: true
+  defp is_zero_value(%Decimal{} = d), do: Decimal.eq?(d, 0)
+  defp is_zero_value(_), do: false
 end
