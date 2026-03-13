@@ -1121,4 +1121,47 @@ defmodule Explorer.Chain.InternalTransaction do
     end)
     |> Map.new()
   end
+
+  @doc """
+  Calculates the total value flow for a single transaction considering ALL internal transactions.
+  
+  - `value_in`: Total sum of all values received (to any address via internal transactions)
+  - `value_out`: Total sum of all values sent (from any address via internal transactions)
+  
+  This is useful for transactions like `claim` or `claimBatch` where the transaction sender
+  doesn't directly receive/send value, but triggers a contract to transfer value to another address.
+  
+  ## Parameters
+    - `transaction_hash`: The hash of the transaction
+    - `options`: Keyword list of options (e.g., api?: true)
+  
+  ## Returns
+    - `%{value_in: Wei.t(), value_out: Wei.t()}` or `%{value_in: %Wei{value: 0}, value_out: %Wei{value: 0}}`
+  
+  ## Example
+      iex> aggregate_total_value_flow_for_transaction(tx_hash)
+      %{value_in: %Wei{value: 0}, value_out: %Wei{value: 299960000000000}}
+  """
+  @spec aggregate_total_value_flow_for_transaction(Hash.Full.t(), [api?]) :: %{
+          value_in: Wei.t(),
+          value_out: Wei.t()
+        }
+  def aggregate_total_value_flow_for_transaction(transaction_hash, options \\ []) do
+    query =
+      from(it in __MODULE__,
+        where: it.transaction_hash == ^transaction_hash,
+        where: it.value > ^0,
+        select: %{
+          total_value: fragment("COALESCE(SUM(value), 0)")
+        }
+      )
+
+    zero = Decimal.new(0)
+
+    case Chain.select_repo(options).one(query) do
+      nil -> %{value_in: %Wei{value: zero}, value_out: %Wei{value: zero}}
+      %{total_value: total} when total > 0 -> %{value_in: %Wei{value: zero}, value_out: %Wei{value: total}}
+      _ -> %{value_in: %Wei{value: zero}, value_out: %Wei{value: zero}}
+    end
+  end
 end

@@ -411,12 +411,42 @@ defmodule BlockScoutWeb.API.V2.AddressController do
           # Aggregate internal transaction value flows for this address
           transaction_hashes = Enum.map(transactions, & &1.hash)
 
-          internal_value_flows =
+          address_flows =
             InternalTransaction.aggregate_value_flows_for_address(
               transaction_hashes,
               address_hash,
               @api_true
             )
+
+          # Apply fallback for transactions with no address-specific flow
+          internal_value_flows =
+            Enum.reduce(transaction_hashes, address_flows, fn tx_hash, flows ->
+              case Map.get(flows, tx_hash) do
+                flow when is_map(flow) ->
+                  if zero_wei_flow?(flow) do
+                    # No value flow for this address, calculate total transaction flow
+                    total_flow =
+                      InternalTransaction.aggregate_total_value_flow_for_transaction(
+                        tx_hash,
+                        @api_true
+                      )
+
+                    Map.put(flows, tx_hash, total_flow)
+                  else
+                    flows
+                  end
+
+                nil ->
+                  # No flow data, calculate total
+                  total_flow =
+                    InternalTransaction.aggregate_total_value_flow_for_transaction(
+                      tx_hash,
+                      @api_true
+                    )
+
+                  Map.put(flows, tx_hash, total_flow)
+              end
+            end)
 
           next_page_params =
             next_page
@@ -1591,4 +1621,15 @@ defmodule BlockScoutWeb.API.V2.AddressController do
         end
     end
   end
+
+  # Helper function to check if a Wei flow has zero values
+  # Handles both integer 0 and Decimal.new(0) from database queries
+  defp zero_wei_flow?(%{value_in: %Chain.Wei{value: in_val}, value_out: %Chain.Wei{value: out_val}}) do
+    is_zero_value(in_val) and is_zero_value(out_val)
+  end
+  defp zero_wei_flow?(_), do: false
+
+  defp is_zero_value(0), do: true
+  defp is_zero_value(%Decimal{} = d), do: Decimal.eq?(d, 0)
+  defp is_zero_value(_), do: false
 end

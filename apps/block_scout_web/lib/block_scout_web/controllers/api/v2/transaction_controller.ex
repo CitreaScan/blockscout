@@ -181,6 +181,35 @@ defmodule BlockScoutWeb.API.V2.TransactionController do
              @token_transfers_in_transaction_necessity_by_association,
              @api_true |> fetch_scam_token_toggle(conn)
            ) do
+      # Try address-specific flow first, fallback to total flow if no value found
+      address_flows = InternalTransaction.aggregate_value_flows_for_address(
+        [transaction.hash],
+        transaction.from_address_hash,
+        @api_true
+      )
+
+      internal_value_flows = case Map.get(address_flows, transaction.hash) do
+        flow when is_map(flow) ->
+          if zero_wei_flow?(flow) do
+            # No value flow for the sender address, calculate total transaction flow
+            total_flow = InternalTransaction.aggregate_total_value_flow_for_transaction(
+              transaction.hash,
+              @api_true
+            )
+            %{transaction.hash => total_flow}
+          else
+            address_flows
+          end
+        
+        nil ->
+          # No flow data, calculate total
+          total_flow = InternalTransaction.aggregate_total_value_flow_for_transaction(
+            transaction.hash,
+            @api_true
+          )
+          %{transaction.hash => total_flow}
+      end
+
       conn
       |> put_status(200)
       |> render(:transaction, %{
@@ -188,7 +217,9 @@ defmodule BlockScoutWeb.API.V2.TransactionController do
           preloaded
           |> Instance.preload_nft(@api_true)
           |> maybe_preload_ens_to_transaction()
-          |> maybe_preload_metadata_to_transaction()
+          |> maybe_preload_metadata_to_transaction(),
+        current_address_hash: transaction.from_address_hash,
+        internal_value_flows: internal_value_flows
       })
     end
   end
@@ -791,4 +822,15 @@ defmodule BlockScoutWeb.API.V2.TransactionController do
       {:ok, transaction, transaction_hash}
     end
   end
+
+  # Helper function to check if a Wei flow has zero values
+  # Handles both integer 0 and Decimal.new(0) from database queries
+  defp zero_wei_flow?(%{value_in: %Chain.Wei{value: in_val}, value_out: %Chain.Wei{value: out_val}}) do
+    is_zero_value(in_val) and is_zero_value(out_val)
+  end
+  defp zero_wei_flow?(_), do: false
+
+  defp is_zero_value(0), do: true
+  defp is_zero_value(%Decimal{} = d), do: Decimal.eq?(d, 0)
+  defp is_zero_value(_), do: false
 end
