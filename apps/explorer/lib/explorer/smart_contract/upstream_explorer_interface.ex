@@ -43,8 +43,13 @@ defmodule Explorer.SmartContract.UpstreamExplorerInterface do
     end
   end
 
-  defp parse_and_transform(%{"is_verified" => true} = data) do
+  defp parse_and_transform(%{"is_verified" => true, "file_path" => file_path, "source_code" => source_code} = data)
+       when is_binary(file_path) and file_path != "" and is_binary(source_code) and source_code != "" do
     {:ok, transform_response(data)}
+  end
+
+  defp parse_and_transform(%{"is_verified" => true}) do
+    {:error, :missing_source}
   end
 
   defp parse_and_transform(%{"is_verified" => false}) do
