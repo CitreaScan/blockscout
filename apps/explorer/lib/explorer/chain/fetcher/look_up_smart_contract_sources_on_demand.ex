@@ -6,6 +6,8 @@ defmodule Explorer.Chain.Fetcher.LookUpSmartContractSourcesOnDemand do
 
   use GenServer
 
+  require Logger
+
   use Utils.RuntimeEnvHelper,
     fetch_interval: [
       :explorer,
@@ -26,6 +28,7 @@ defmodule Explorer.Chain.Fetcher.LookUpSmartContractSourcesOnDemand do
   alias Explorer.Chain.{Address, Data, SmartContract}
   alias Explorer.Chain.Events.Publisher
   alias Explorer.SmartContract.EthBytecodeDBInterface
+  alias Explorer.SmartContract.UpstreamExplorerInterface
   alias Explorer.SmartContract.Geas.Publisher, as: GeasPublisher
   alias Explorer.SmartContract.Solidity.Publisher, as: SolidityPublisher
   alias Explorer.SmartContract.Vyper.Publisher, as: VyperPublisher
@@ -104,8 +107,14 @@ defmodule Explorer.Chain.Fetcher.LookUpSmartContractSourcesOnDemand do
       Publisher.broadcast(%{smart_contract_was_verified: [address_hash_string]}, :on_demand)
     else
       _ ->
-        Publisher.broadcast(%{smart_contract_was_not_verified: [address_hash_string]}, :on_demand)
-        false
+        case fetch_from_upstream_explorer(address_hash_string) do
+          :verified ->
+            Publisher.broadcast(%{smart_contract_was_verified: [address_hash_string]}, :on_demand)
+
+          _ ->
+            Publisher.broadcast(%{smart_contract_was_not_verified: [address_hash_string]}, :on_demand)
+            false
+        end
     end
   end
 
@@ -202,6 +211,29 @@ defmodule Explorer.Chain.Fetcher.LookUpSmartContractSourcesOnDemand do
   end
 
   def process_contract_source(_, _source, _address_hash), do: false
+
+  defp fetch_from_upstream_explorer(address_hash_string) do
+    if UpstreamExplorerInterface.enabled?() do
+      Logger.info("Attempting upstream explorer fetch for #{address_hash_string}")
+
+      case UpstreamExplorerInterface.fetch_verified_source(address_hash_string) do
+        {:ok, %{"sourceType" => type} = source} ->
+          case process_contract_source(type, source, address_hash_string) do
+            {:ok, _} -> :verified
+            _ -> :not_found
+          end
+
+        {:error, :not_verified_upstream} ->
+          :not_found
+
+        {:error, reason} ->
+          Logger.warning("Upstream explorer fetch failed for #{address_hash_string}: #{inspect(reason)}")
+          :not_found
+      end
+    else
+      :not_found
+    end
+  end
 
   defp check_match_type("PARTIAL", true), do: :full_match_required
   defp check_match_type(_, _), do: :ok
