@@ -1184,13 +1184,6 @@ config :indexer, Indexer.Migrator.RecoveryWETHTokenTransfers,
     ConfigHelper.parse_integer_env_var("MIGRATION_RECOVERY_WETH_TOKEN_TRANSFERS_BLOCKS_BATCH_SIZE", 100_000),
   high_verbosity: ConfigHelper.parse_bool_env_var("MIGRATION_RECOVERY_WETH_TOKEN_TRANSFERS_HIGH_VERBOSITY", "true")
 
-config :indexer, Indexer.Migrator.BackfillNonIndexedWETHTransfers,
-  concurrency: ConfigHelper.parse_integer_env_var("MIGRATION_BACKFILL_NON_INDEXED_WETH_CONCURRENCY", 5),
-  batch_size: ConfigHelper.parse_integer_env_var("MIGRATION_BACKFILL_NON_INDEXED_WETH_BATCH_SIZE", 50),
-  timeout: ConfigHelper.parse_time_env_var("MIGRATION_BACKFILL_NON_INDEXED_WETH_TIMEOUT", "0s"),
-  blocks_batch_size:
-    ConfigHelper.parse_integer_env_var("MIGRATION_BACKFILL_NON_INDEXED_WETH_BLOCKS_BATCH_SIZE", 100_000)
-
 config :indexer, Indexer.Fetcher.MultichainSearchDb.MainExportQueue,
   concurrency: ConfigHelper.parse_integer_env_var("INDEXER_MULTICHAIN_SEARCH_DB_EXPORT_MAIN_QUEUE_CONCURRENCY", 10),
   batch_size: ConfigHelper.parse_integer_env_var("INDEXER_MULTICHAIN_SEARCH_DB_EXPORT_MAIN_QUEUE_BATCH_SIZE", 3_000),
