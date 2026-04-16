@@ -18,7 +18,7 @@ defmodule Indexer.Migrator.RecoveryWETHTokenTransfers do
   alias Explorer.Migrator.MigrationStatus
   alias Indexer.Transform.TokenTransfers
 
-  @migration_name "recovery_weth_token_transfers"
+  @migration_name "recovery_weth_token_transfers_v2"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
