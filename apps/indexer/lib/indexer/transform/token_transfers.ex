@@ -298,6 +298,52 @@ defmodule Indexer.Transform.TokenTransfers do
     {token, token_transfer}
   end
 
+  # WETH deposit/withdrawal with non-indexed address parameter (e.g. Citrea system contracts)
+  # Standard WETH has Withdrawal(address indexed wid, uint256 wad) with the address in second_topic,
+  # but some contracts emit Withdrawal(address, uint256) without indexing, so both params are in data.
+  defp parse_params(
+         %{
+           first_topic: first_topic,
+           second_topic: nil,
+           third_topic: nil,
+           fourth_topic: nil,
+           data: data
+         } = log
+       )
+       when not is_nil(data) and
+              (first_topic == unquote(TokenTransfer.weth_withdrawal_signature()) or
+                 first_topic == unquote(TokenTransfer.weth_deposit_signature())) do
+    [address, amount] = decode_data(data, [:address, {:uint, 256}])
+    decoded_address = "0x" <> Base.encode16(address, case: :lower)
+
+    {from_address_hash, to_address_hash} =
+      if first_topic == TokenTransfer.weth_deposit_signature() do
+        {burn_address_hash_string(), decoded_address}
+      else
+        {decoded_address, burn_address_hash_string()}
+      end
+
+    token_transfer = %{
+      amount: Decimal.new(amount || 0),
+      block_number: log.block_number,
+      block_hash: log.block_hash,
+      log_index: log.index,
+      from_address_hash: from_address_hash,
+      to_address_hash: to_address_hash,
+      token_contract_address_hash: log.address_hash,
+      transaction_hash: log.transaction_hash,
+      token_ids: nil,
+      token_type: "ERC-20"
+    }
+
+    token = %{
+      contract_address_hash: log.address_hash,
+      type: "ERC-20"
+    }
+
+    {token, token_transfer}
+  end
+
   # ERC-721 token transfer with info in data field instead of in log topics
   defp parse_params(
          %{

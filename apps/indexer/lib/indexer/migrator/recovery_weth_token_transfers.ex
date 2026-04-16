@@ -1,7 +1,11 @@
 defmodule Indexer.Migrator.RecoveryWETHTokenTransfers do
   @moduledoc """
-  Recovers WETH token transfers that were accidentally deleted from the database by previous version of Explorer.Migrator.SanitizeIncorrectWETHTokenTransfers.
-  This migration restores missing transfers by logs.
+  Recovers missing WETH token transfers by scanning logs for deposit/withdrawal
+  events that have no corresponding token_transfer record.
+
+  Covers two cases:
+  - Transfers accidentally deleted by a previous SanitizeIncorrectWETHTokenTransfers
+  - Transfers never created due to non-indexed address parameters (e.g. Citrea system contracts)
   """
 
   use GenServer, restart: :transient
@@ -14,7 +18,7 @@ defmodule Indexer.Migrator.RecoveryWETHTokenTransfers do
   alias Explorer.Migrator.MigrationStatus
   alias Indexer.Transform.TokenTransfers
 
-  @migration_name "recovery_weth_token_transfers"
+  @migration_name "recovery_weth_token_transfers_v2"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
@@ -107,16 +111,18 @@ defmodule Indexer.Migrator.RecoveryWETHTokenTransfers do
   end
 
   defp unprocessed_data_query(max_block_number, transaction_hash) do
-    base_query = from(log in Log, as: :log)
-
-    base_query
+    from(log in Log, as: :log)
     |> where(^Log.first_topic_is_deposit_or_withdrawal_signature())
+    |> join(:left, [log], tt in TokenTransfer,
+      on:
+        log.transaction_hash == tt.transaction_hash and log.index == tt.log_index and log.block_hash == tt.block_hash
+    )
+    |> where([log, tt], is_nil(tt.transaction_hash))
     |> apply_block_number_condition(max_block_number)
     |> apply_transaction_hash_condition(transaction_hash)
-    |> group_by([log], [log.transaction_hash, log.address_hash, log.first_topic, log.second_topic])
-    |> having([log], count(log) > 1)
     |> order_by([log], asc: log.transaction_hash)
     |> select([log], log.transaction_hash)
+    |> distinct(true)
   end
 
   defp apply_block_number_condition(query, 0), do: query |> where([log], log.block_number == 0)
@@ -155,7 +161,9 @@ defmodule Indexer.Migrator.RecoveryWETHTokenTransfers do
         %Log{
           log
           | first_topic: to_string(log.first_topic),
-            second_topic: to_string(log.second_topic),
+            second_topic: log.second_topic && to_string(log.second_topic),
+            third_topic: log.third_topic && to_string(log.third_topic),
+            fourth_topic: log.fourth_topic && to_string(log.fourth_topic),
             data: to_string(log.data)
         }
       end)
