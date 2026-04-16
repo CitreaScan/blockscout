@@ -634,6 +634,9 @@ config :explorer, Explorer.SmartContract.RustVerifierInterfaceBehaviour,
   eth_bytecode_db?: enabled? && type == "eth_bytecode_db",
   api_key: System.get_env("MICROSERVICE_SC_VERIFIER_API_KEY")
 
+config :explorer, Explorer.SmartContract.UpstreamExplorerInterface,
+  service_url: System.get_env("UPSTREAM_EXPLORER_URL")
+
 config :explorer, Explorer.Visualize.Sol2uml,
   service_url: System.get_env("MICROSERVICE_VISUALIZE_SOL2UML_URL"),
   enabled: ConfigHelper.parse_bool_env_var("MICROSERVICE_VISUALIZE_SOL2UML_ENABLED")
