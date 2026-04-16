@@ -64,6 +64,7 @@ defmodule Indexer.Supervisor do
   alias Indexer.Fetcher.ZkSync.BatchesStatusTracker, as: ZkSyncBatchesStatusTracker
   alias Indexer.Fetcher.ZkSync.TransactionBatch, as: ZkSyncTransactionBatch
 
+  alias Indexer.Migrator.BackfillNonIndexedWETHTransfers
   alias Indexer.Migrator.RecoveryWETHTokenTransfers
 
   alias Indexer.Temporary.{
@@ -285,6 +286,7 @@ defmodule Indexer.Supervisor do
         {PendingBlockOperationsSanitizer, [[]]},
         {RootstockData.Supervisor, [[json_rpc_named_arguments: json_rpc_named_arguments]]},
         configure(RecoveryWETHTokenTransfers, [[memory_monitor: memory_monitor]]),
+        configure(BackfillNonIndexedWETHTransfers, [[memory_monitor: memory_monitor]]),
 
         # Block fetchers
         configure(BlockRealtime.Supervisor, [
