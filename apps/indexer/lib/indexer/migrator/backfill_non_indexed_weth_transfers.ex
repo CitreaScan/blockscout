@@ -164,7 +164,9 @@ defmodule Indexer.Migrator.BackfillNonIndexedWETHTransfers do
         %Log{
           log
           | first_topic: to_string(log.first_topic),
-            second_topic: to_string(log.second_topic),
+            second_topic: log.second_topic && to_string(log.second_topic),
+            third_topic: log.third_topic && to_string(log.third_topic),
+            fourth_topic: log.fourth_topic && to_string(log.fourth_topic),
             data: to_string(log.data)
         }
       end)
