@@ -494,6 +494,9 @@ config :explorer, Explorer.Market.Source.Mobula,
   secondary_coin_id:
     System.get_env("MARKET_MOBULA_SECONDARY_COIN_ID") || System.get_env("EXCHANGE_RATES_MOBULA_SECONDARY_COIN_ID")
 
+config :explorer, Explorer.Market.Source.FixedPrice,
+  tokens: System.get_env("MARKET_FIXED_PRICE_TOKENS")
+
 config :explorer, Explorer.Market.Fetcher.Coin,
   store: :ets,
   enabled: !disable_exchange_rates? && ConfigHelper.parse_bool_env_var("MARKET_COIN_FETCHER_ENABLED", "true"),

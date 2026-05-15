@@ -230,6 +230,7 @@ defmodule ConfigHelper do
           | Source.CryptoCompare
           | Source.CryptoRank
           | Source.DefiLlama
+          | Source.FixedPrice
           | Source.Mobula
           | nil
   def market_source(env_var) do
@@ -239,6 +240,7 @@ defmodule ConfigHelper do
       "crypto_compare" => Source.CryptoCompare,
       "crypto_rank" => Source.CryptoRank,
       "defillama" => Source.DefiLlama,
+      "fixed_price" => Source.FixedPrice,
       "mobula" => Source.Mobula,
       "" => nil,
       nil => nil
