@@ -56,10 +56,10 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-blockscout}:${POSTGRES_PASSWORD:-ceWb1MeLBEeOIfk65gU8EjF8}@db:5432/${POSTGRES_DB:-blockscout}
       ACCOUNT_REDIS_URL: redis://redis-db:6379
-      # Citrea Testnet (DEV RPC)
-      ETHEREUM_JSONRPC_HTTP_URL: https://dev.rpc.testnet.citreascan.com/
-      ETHEREUM_JSONRPC_TRACE_URL: https://dev.rpc.testnet.citreascan.com/
-      CHAIN_ID: '5115'
+      # Citrea Mainnet
+      ETHEREUM_JSONRPC_HTTP_URL: https://rpc.citreascan.com
+      ETHEREUM_JSONRPC_TRACE_URL: https://rpc.citreascan.com
+      CHAIN_ID: '4114'
     ports:
       - '4000:4000'
     logging:
@@ -88,20 +88,20 @@ services:
       NEXT_PUBLIC_APP_PROTOCOL: http
       NEXT_PUBLIC_STATS_API_HOST: ''
       NEXT_PUBLIC_VISUALIZE_API_HOST: ''
-      NEXT_PUBLIC_NETWORK_NAME: Citrea Testnet
-      NEXT_PUBLIC_NETWORK_SHORT_NAME: Citrea Testnet
-      NEXT_PUBLIC_NETWORK_ID: '5115'
+      NEXT_PUBLIC_NETWORK_NAME: Citrea
+      NEXT_PUBLIC_NETWORK_SHORT_NAME: Citrea
+      NEXT_PUBLIC_NETWORK_ID: '4114'
       NEXT_PUBLIC_NETWORK_CURRENCY_NAME: Citrea
       NEXT_PUBLIC_NETWORK_CURRENCY_SYMBOL: cBTC
       NEXT_PUBLIC_NETWORK_CURRENCY_DECIMALS: '18'
-      NEXT_PUBLIC_IS_TESTNET: 'true'
+      NEXT_PUBLIC_IS_TESTNET: 'false'
       NEXT_PUBLIC_HOMEPAGE_CHARTS: "['daily_txs']"
       NEXT_PUBLIC_AD_BANNER_PROVIDER: none
       NEXT_PUBLIC_AD_TEXT_PROVIDER: none
       NEXT_PUBLIC_PROMOTE_BLOCKSCOUT_IN_TITLE: 'false'
       NEXT_PUBLIC_TRANSACTION_INTERPRETATION_PROVIDER: blockscout
-      NEXT_PUBLIC_OG_DESCRIPTION: "Explore the Citrea Testnet blockchain with CitreaScan. Track transactions, verify contracts, analyze addresses, and access complete blockchain data and APIs."
-      NEXT_PUBLIC_NETWORK_RPC_URL: https://dev.rpc.testnet.citreascan.com/
+      NEXT_PUBLIC_OG_DESCRIPTION: "Explore the Citrea blockchain with CitreaScan. Track transactions, verify contracts, analyze addresses, and access complete blockchain data and APIs."
+      NEXT_PUBLIC_NETWORK_RPC_URL: https://rpc.citreascan.com
       NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID: 743867c2-73db-402e-bd47-c875169c3792
     ports:
       - '3000:3000'
